@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>F1 Snake — Mobile Controls Added</title>
+<title>F1 Snake — Mobile Speed Fix with Obstacles</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <style>
   html, body {
@@ -195,9 +195,15 @@
     }
   }
 
-  // Animate loop
+  // Animate loop with delta timing
+  let lastTime = performance.now();
+
   function animate() {
     requestAnimationFrame(animate);
+    const now = performance.now();
+    const delta = (now - lastTime) / 16.67; // ~60fps normalization
+    lastTime = now;
+
     if (!alive) {
       renderer.render(scene, camera);
       return;
@@ -205,8 +211,8 @@
     const player = cars[0];
 
     // Steering input (keyboard + touch)
-    if (keys['a'] || keys['arrowleft'] || touchLeft) player.rotationY += 0.05;
-    if (keys['d'] || keys['arrowright'] || touchRight) player.rotationY -= 0.05;
+    if (keys['a'] || keys['arrowleft'] || touchLeft) player.rotationY += 0.05 * delta;
+    if (keys['d'] || keys['arrowright'] || touchRight) player.rotationY -= 0.05 * delta;
 
     // Boost input (space or double/two-finger tap)
     if ((keys[' '] && canBoost(player)) || player.boost.active) {
@@ -219,7 +225,7 @@
 
     // Move forward
     const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotationY);
-    player.position.add(forward.multiplyScalar(speed));
+    player.position.add(forward.multiplyScalar(speed * delta));
 
     // Followers follow leader
     for (let i = 1; i < cars.length; i++) {
@@ -229,7 +235,7 @@
       const dist = dir.length();
       if (dist > SEGMENT_DISTANCE) {
         dir.normalize();
-        follower.position.add(dir.multiplyScalar((dist - SEGMENT_DISTANCE) * 0.5));
+        follower.position.add(dir.multiplyScalar((dist - SEGMENT_DISTANCE) * 0.5 * delta));
         follower.rotationY = Math.atan2(dir.x, dir.z);
       }
     }
