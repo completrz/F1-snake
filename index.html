@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>F1 Snake — Visible Box Cars</title>
+<title>F1 Snake — Obstacles & Tail Start 0</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   html, body {
@@ -31,6 +31,7 @@
   const BOOST_MULTIPLIER = 2.4;
   const BOOST_DURATION = 2000; // ms
   const BOOST_COOLDOWN = 4000; // ms
+  const OBSTACLE_COUNT = 10;
 
   // --- Setup scene, camera, renderer ---
   const scene = new THREE.Scene();
@@ -71,17 +72,16 @@
 
   // --- Player & followers ---
   const cars = [];
-  const baseColor = 0xff2d55;
   cars.push({
     position: new THREE.Vector3(0, 0, 0),
     rotationY: 0,
-    mesh: makeCar(baseColor),
+    mesh: makeCar(0xff2d55),
     boost: { active: false, cooldown: 0, timer: 0 }
   });
   scene.add(cars[0].mesh);
   cars[0].mesh.position.set(0, 0, 0);
 
-  // Followers
+  // Add follower function (used on pickup)
   function addFollower() {
     const follower = {
       position: new THREE.Vector3(0, 0, 0),
@@ -91,8 +91,6 @@
     scene.add(follower.mesh);
     cars.push(follower);
   }
-  // Start with 3 followers
-  for (let i = 0; i < 3; i++) addFollower();
 
   // --- Pickups ---
   const pickups = [];
@@ -109,6 +107,24 @@
     pickups.push(mesh);
   }
   for (let i = 0; i < 6; i++) spawnPickup();
+
+  // --- Obstacles ---
+  const obstacles = [];
+  function spawnObstacles() {
+    for(let i=0; i < OBSTACLE_COUNT; i++) {
+      const r = THREE.MathUtils.randFloat(15, ARENA_RADIUS - 15);
+      const a = THREE.MathUtils.randFloat(0, Math.PI * 2);
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(6, 6, 6),
+        new THREE.MeshStandardMaterial({color: 0xaa0000})
+      );
+      mesh.position.set(x, 3, z);
+      scene.add(mesh);
+      obstacles.push(mesh);
+    }
+  }
+  spawnObstacles();
 
   // --- Controls ---
   const keys = {};
@@ -195,6 +211,14 @@
         // Add follower
         addFollower();
         spawnPickup();
+      }
+    }
+
+    // Obstacle collision
+    for(const obs of obstacles){
+      if(obs.position.distanceTo(player.position) < 4.5){
+        scoreEl.textContent = `Crashed into obstacle! Final Score: ${score}`;
+        alive = false;
       }
     }
 
