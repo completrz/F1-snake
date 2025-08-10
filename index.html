@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>F1 Snake — Tail Fixed on Mobile & Desktop</title>
+<title>F1 Snake — Followers Spawn Behind</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <style>
   html, body {
@@ -84,11 +84,15 @@
   cars[0].mesh.position.set(0, 0, 0);
 
   function addFollower() {
+    const leader = cars[cars.length - 1];
     const follower = {
-      position: new THREE.Vector3(0, 0, 0),
-      rotationY: 0,
+      position: new THREE.Vector3(),
+      rotationY: leader.rotationY,
       mesh: makeCar(0xff8a00),
     };
+    // Position follower behind leader by SEGMENT_DISTANCE
+    const backOffset = new THREE.Vector3(0, 0, -SEGMENT_DISTANCE).applyAxisAngle(new THREE.Vector3(0,1,0), leader.rotationY);
+    follower.position.copy(leader.position).add(backOffset);
     scene.add(follower.mesh);
     cars.push(follower);
   }
@@ -225,7 +229,6 @@
       const dist = dir.length();
       if (dist > SEGMENT_DISTANCE) {
         dir.normalize();
-        // Move only up to distance to avoid overshoot
         follower.position.add(dir.multiplyScalar(Math.min(dist - SEGMENT_DISTANCE, speed * delta * 1.5)));
       }
       const targetRotation = Math.atan2(dir.x, dir.z);
