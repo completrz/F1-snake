@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>F1 Snake — Proper Delta Timing Fix</title>
+<title>F1 Snake — Balanced Speed for Mobile & Desktop</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <style>
   html, body {
@@ -29,12 +29,19 @@
 (() => {
   const ARENA_RADIUS = 120;
   const SEGMENT_DISTANCE = 6;
-  const BASE_SPEED = 10;  // units per second (tweak this)
   const BOOST_MULTIPLIER = 2.4;
   const BOOST_DURATION = 2000; // ms
   const BOOST_COOLDOWN = 4000; // ms
   const OBSTACLE_COUNT = 10;
-  const ROTATION_SPEED = 3; // radians per second (~172 degrees/sec)
+
+  // Detect mobile for speed tuning
+  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+
+  // Speeds tuned per device
+  const BASE_SPEED_DESKTOP = 15;
+  const BASE_SPEED_MOBILE = 7;
+  const ROTATION_SPEED_DESKTOP = 3.5;
+  const ROTATION_SPEED_MOBILE = 2.5;
 
   // Setup scene, camera, renderer
   const scene = new THREE.Scene();
@@ -196,13 +203,14 @@
     }
   }
 
-  // Animate loop with proper delta timing
+  // Animate loop with delta clamp & device speeds
   let lastTime = performance.now();
 
   function animate() {
     requestAnimationFrame(animate);
     const now = performance.now();
-    const delta = (now - lastTime) / 1000; // delta in seconds
+    const deltaRaw = (now - lastTime) / 1000;
+    const delta = Math.min(deltaRaw, 0.05); // clamp max 50ms per frame
     lastTime = now;
 
     if (!alive) {
@@ -210,6 +218,10 @@
       return;
     }
     const player = cars[0];
+
+    // Device based speeds
+    const BASE_SPEED = isMobile ? BASE_SPEED_MOBILE : BASE_SPEED_DESKTOP;
+    const ROTATION_SPEED = isMobile ? ROTATION_SPEED_MOBILE : ROTATION_SPEED_DESKTOP;
 
     // Steering input
     if (keys['a'] || keys['arrowleft'] || touchLeft) player.rotationY += ROTATION_SPEED * delta;
