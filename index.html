@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>F1 Snake — Balanced Speed & Smooth Tail</title>
+<title>F1 Snake — Tail Fixed on Mobile & Desktop</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <style>
   html, body {
@@ -218,7 +218,6 @@
     const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotationY);
     player.position.add(forward.multiplyScalar(speed * delta));
 
-    // Followers fixed:
     for (let i = 1; i < cars.length; i++) {
       const leader = cars[i - 1];
       const follower = cars[i];
@@ -226,10 +225,11 @@
       const dist = dir.length();
       if (dist > SEGMENT_DISTANCE) {
         dir.normalize();
-        follower.position.add(dir.multiplyScalar(dist - SEGMENT_DISTANCE));
+        // Move only up to distance to avoid overshoot
+        follower.position.add(dir.multiplyScalar(Math.min(dist - SEGMENT_DISTANCE, speed * delta * 1.5)));
       }
       const targetRotation = Math.atan2(dir.x, dir.z);
-      follower.rotationY += (targetRotation - follower.rotationY) * 0.1;
+      follower.rotationY += (targetRotation - follower.rotationY) * 0.15;
     }
 
     for (let i = 0; i < cars.length; i++) {
