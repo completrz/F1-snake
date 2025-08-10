@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>F1 Snake — Mobile Speed Fix with Obstacles</title>
+<title>F1 Snake — Proper Delta Timing Fix</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <style>
   html, body {
@@ -29,11 +29,12 @@
 (() => {
   const ARENA_RADIUS = 120;
   const SEGMENT_DISTANCE = 6;
-  const BASE_SPEED = 1.5;
+  const BASE_SPEED = 10;  // units per second (tweak this)
   const BOOST_MULTIPLIER = 2.4;
   const BOOST_DURATION = 2000; // ms
   const BOOST_COOLDOWN = 4000; // ms
   const OBSTACLE_COUNT = 10;
+  const ROTATION_SPEED = 3; // radians per second (~172 degrees/sec)
 
   // Setup scene, camera, renderer
   const scene = new THREE.Scene();
@@ -195,13 +196,13 @@
     }
   }
 
-  // Animate loop with delta timing
+  // Animate loop with proper delta timing
   let lastTime = performance.now();
 
   function animate() {
     requestAnimationFrame(animate);
     const now = performance.now();
-    const delta = (now - lastTime) / 16.67; // ~60fps normalization
+    const delta = (now - lastTime) / 1000; // delta in seconds
     lastTime = now;
 
     if (!alive) {
@@ -210,17 +211,17 @@
     }
     const player = cars[0];
 
-    // Steering input (keyboard + touch)
-    if (keys['a'] || keys['arrowleft'] || touchLeft) player.rotationY += 0.05 * delta;
-    if (keys['d'] || keys['arrowright'] || touchRight) player.rotationY -= 0.05 * delta;
+    // Steering input
+    if (keys['a'] || keys['arrowleft'] || touchLeft) player.rotationY += ROTATION_SPEED * delta;
+    if (keys['d'] || keys['arrowright'] || touchRight) player.rotationY -= ROTATION_SPEED * delta;
 
-    // Boost input (space or double/two-finger tap)
+    // Boost input
     if ((keys[' '] && canBoost(player)) || player.boost.active) {
       if (keys[' '] && canBoost(player)) startBoost(player);
     }
     updateBoost(player);
 
-    // Calculate speed
+    // Calculate speed per second
     const speed = BASE_SPEED * (player.boost.active ? BOOST_MULTIPLIER : 1);
 
     // Move forward
