@@ -1,29 +1,42 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>F1 Snake — Tail & Obstacles</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    html,body { height:100%; margin:0; background:#111; overflow:hidden; font-family:sans-serif; }
-    #ui {
-      position: absolute; top: 12px; left: 12px; color: #fff; z-index: 10;
-      background: rgba(0,0,0,0.25); padding: 8px 10px; border-radius: 8px;
-    }
-  </style>
+<meta charset="utf-8" />
+<title>F1 Snake — Boost & Car Sprite</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: #111;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+      Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  }
+  #ui {
+    position: absolute; top: 12px; left: 12px; color: #fff; z-index: 10;
+    background: rgba(0,0,0,0.25); padding: 8px 12px; border-radius: 8px;
+    user-select: none;
+  }
+  #ui small {
+    display: block; margin-top: 4px; font-size: 12px; color: #ccc;
+  }
+</style>
 </head>
 <body>
-  <div id="ui">Score: <span id="score">0</span></div>
+<div id="ui">
+  Score: <span id="score">0</span>
+  <small>Controls: A/D or ◀️/▶️ to steer, Space to boost (2s cooldown)</small>
+</div>
 
-  <script src="https://unpkg.com/three@0.154.0/build/three.min.js"></script>
-  <script>
-  // --- CONFIG ---
+<script src="https://unpkg.com/three@0.154.0/build/three.min.js"></script>
+<script>
+(() => {
   const ARENA_RADIUS = 120;
   const SEGMENT_DISTANCE = 6;
-  const SPEED = 1.5;
-  const OBSTACLE_COUNT = 10;
+  const BASE_SPEED = 1.5;
+  const BOOST_MULTIPLIER = 2.4;
+  const BOOST_DURATION = 2000; // ms
+  const BOOST_COOLDOWN = 4000; // ms
 
-  // --- SCENE SETUP ---
+  // --- Setup scene, camera, renderer ---
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x111111, 0.0025);
   const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.5, 1000);
@@ -34,7 +47,7 @@
   const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
   scene.add(light);
 
-  // ground
+  // Ground
   const ground = new THREE.Mesh(
     new THREE.CircleGeometry(ARENA_RADIUS, 64),
     new THREE.MeshStandardMaterial({color:0x0d3b66})
@@ -42,146 +55,196 @@
   ground.rotation.x = -Math.PI/2;
   scene.add(ground);
 
-  // --- CREATE CAR MESH ---
-  function makeCar(color=0xff2d55) {
-    const group = new THREE.Group();
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(3.4, 1.2, 7.6),
-      new THREE.MeshStandardMaterial({color})
-    );
-    body.position.y = 1;
-    group.add(body);
-    const nose = new THREE.Mesh(
-      new THREE.BoxGeometry(2.6, 0.8, 2.6),
-      new THREE.MeshStandardMaterial({color:color+0x222222})
-    );
-    nose.position.set(0, 1.08, 3.25);
-    group.add(nose);
-    return group;
+  // Shadows helper
+  const shadowMaterial = new THREE.ShadowMaterial({ opacity: 0.4 });
+  shadowMaterial.transparent = true;
+
+  // --- Create a textured plane with embedded base64 F1 car top-down sprite ---
+  // Car image: simple stylized F1 shape (white/red on transparent)
+  // This is a 64x128 px PNG encoded as base64
+  const carBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAEEElEQVR4nO2bTWsUURTGf+/CZGwRFCKzMEWcIq6A4UwQRqFKMIoL0IARExAwEBERvCRUOoJjHgQKXBRcgWByGGXAl8QtIhgwKFRFgBIkEhcJ0FHiRYIY8fPe+5d27ZnmZmZmd2D66qt/T/tlXuu2vm7PPOdbTf4ns4ATjHRF88h6jgDawKeEcZLzDSIGzmQe6E3Et4xnRPTf2NtJUyceEcD9cmVZ1MJ57cApkg3BLSMDOqD3CUhrwJoAlwJGJp+1mXAgcBp2oDyyDNeYHEuI5cAjwCOdLfFTwp9XqXZzvBxLwH2dGwzhyTq9XqZauQIQz+MHyD4Q7xmcm6XQRbAGGcyvTxS/FdyUy7cB5chMRyT48DkAi9V5vXovDKBd2iqPHeD7lIv+fjGzHmHQDcCywBP8ChzHk+8L5cgTXcBx/JULPaFK9EYB3cEuJVLHcgPESnzoEsB3siTKKh22Ec4D5zOfKTiRmAzxhxFcyNcMGOAsxmcwy+JO5DiXgc4EOyAzkytp4wtMdhyJeBwJu9HVt2QDF/K8a8ixcDuzq2v1eRMDjhH9Lu81/3xCM/b6h3Pp0DB/KACbQckQ/4Ms0lNsEzCd4kDfKAGjO3o2fwEM4BQjyAUIXpXBApTnBVuB51QGrORyK5hHSQ9VvC6PwMYcRVMQz+YA7o5zkkAlZr4ZHHkJQZ1ZGYpXfPYtFlvRYl/n7OZCFN3v+DRCmIQ51PJ6TQQ34GzYgS8wO4AboJXwS2EU5s3I8BlZnFvjHaWZ/g9+boqaj4A9dU1+6LGT7uQAAAABJRU5ErkJggg==";
+
+  function makeCarMesh(scale=1) {
+    const tex = new THREE.TextureLoader().load(carBase64);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.LinearMipMapLinearFilter;
+
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      depthWrite: false,
+    });
+    const geo = new THREE.PlaneGeometry(3 * scale, 6 * scale);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 1.05;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
   }
 
-  // --- PLAYER & FOLLOWERS ---
+  // --- Player & followers ---
   const cars = [];
-  cars.push(makeCar());
-  scene.add(cars[0]);
-  cars[0].position.set(0,1,0);
+  const carMeshes = [];
+  const baseScale = 1;
+  cars.push({
+    position: new THREE.Vector3(0, 0, 0),
+    rotationY: 0,
+    mesh: makeCarMesh(baseScale),
+    boost: { active: false, cooldown: 0, timer: 0 }
+  });
+  scene.add(cars[0].mesh);
+  cars[0].mesh.position.set(0, 1, 0);
 
-  // --- PICKUPS ---
+  // Followers
+  function addFollower() {
+    const scale = baseScale * 0.85;
+    const follower = {
+      position: new THREE.Vector3(0, 0, 0),
+      rotationY: 0,
+      mesh: makeCarMesh(scale),
+    };
+    scene.add(follower.mesh);
+    cars.push(follower);
+  }
+  // Start with 3 followers
+  for (let i = 0; i < 3; i++) addFollower();
+
+  // --- Pickups ---
   const pickups = [];
   function spawnPickup() {
-    const r = THREE.MathUtils.randFloat(10, ARENA_RADIUS-10);
-    const a = THREE.MathUtils.randFloat(0, Math.PI*2);
-    const x = Math.cos(a)*r, z = Math.sin(a)*r;
-    const mesh = new THREE.Mesh(
-      new THREE.ConeGeometry(1.2, 2.2, 10),
-      new THREE.MeshStandardMaterial({color:0x00ffae})
-    );
-    mesh.position.set(x,1.1,z);
+    const r = THREE.MathUtils.randFloat(10, ARENA_RADIUS - 10);
+    const a = THREE.MathUtils.randFloat(0, Math.PI * 2);
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const coneGeo = new THREE.ConeGeometry(1.2, 2.2, 10);
+    const coneMat = new THREE.MeshStandardMaterial({ color: 0x00ffae });
+    const mesh = new THREE.Mesh(coneGeo, coneMat);
+    mesh.position.set(x, 1.1, z);
+    mesh.rotation.x = Math.PI;
     scene.add(mesh);
     pickups.push(mesh);
   }
-  for(let i=0;i<6;i++) spawnPickup();
+  for (let i = 0; i < 6; i++) spawnPickup();
 
-  // --- OBSTACLES ---
-  const obstacles = [];
-  function spawnObstacles() {
-    for(let i=0;i<OBSTACLE_COUNT;i++){
-      const r = THREE.MathUtils.randFloat(15, ARENA_RADIUS-15);
-      const a = THREE.MathUtils.randFloat(0, Math.PI*2);
-      const x = Math.cos(a)*r, z = Math.sin(a)*r;
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(6, 6, 6),
-        new THREE.MeshStandardMaterial({color:0xaa0000})
-      );
-      mesh.position.set(x,3,z);
-      scene.add(mesh);
-      obstacles.push(mesh);
-    }
-  }
-  spawnObstacles();
-
-  // --- CONTROLS ---
+  // --- Controls ---
   const keys = {};
-  onkeydown = e => keys[e.key.toLowerCase()] = true;
-  onkeyup = e => keys[e.key.toLowerCase()] = false;
+  window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+  window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
+  // --- Game state ---
   let score = 0;
   const scoreEl = document.getElementById('score');
   let alive = true;
 
-  // --- GAME LOOP ---
-  function animate(){
+  // --- Boost handling ---
+  function canBoost(car) {
+    const now = performance.now();
+    if (car.boost.cooldown && now < car.boost.cooldown) return false;
+    return true;
+  }
+  function startBoost(car) {
+    const now = performance.now();
+    car.boost.active = true;
+    car.boost.timer = now + BOOST_DURATION;
+    car.boost.cooldown = now + BOOST_DURATION + BOOST_COOLDOWN;
+  }
+  function updateBoost(car) {
+    const now = performance.now();
+    if (car.boost.active && now > car.boost.timer) {
+      car.boost.active = false;
+    }
+  }
+
+  // --- Animate loop ---
+  function animate() {
     requestAnimationFrame(animate);
-    if(!alive){
+    if (!alive) {
       renderer.render(scene, camera);
       return;
     }
-
     const player = cars[0];
-    if(keys['a']||keys['arrowleft']) player.rotation.y += 0.05;
-    if(keys['d']||keys['arrowright']) player.rotation.y -= 0.05;
 
-    const forward = new THREE.Vector3(0,0,1).applyQuaternion(player.quaternion);
-    player.position.add(forward.multiplyScalar(SPEED));
+    // Steering input
+    if (keys['a'] || keys['arrowleft']) player.rotationY += 0.05;
+    if (keys['d'] || keys['arrowright']) player.rotationY -= 0.05;
 
-    // followers follow leader
-    for(let i=1;i<cars.length;i++){
-      const leader = cars[i-1];
+    // Boost input (space)
+    if (keys[' '] && canBoost(player)) {
+      startBoost(player);
+    }
+    updateBoost(player);
+
+    // Calculate speed
+    const speed = BASE_SPEED * (player.boost.active ? BOOST_MULTIPLIER : 1);
+
+    // Move forward
+    const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotationY);
+    player.position.add(forward.multiplyScalar(speed));
+
+    // Followers follow leader
+    for (let i = 1; i < cars.length; i++) {
+      const leader = cars[i - 1];
       const follower = cars[i];
       const dir = new THREE.Vector3().subVectors(leader.position, follower.position);
       const dist = dir.length();
-      if(dist > SEGMENT_DISTANCE){
+      if (dist > SEGMENT_DISTANCE) {
         dir.normalize();
-        follower.position.add(dir.multiplyScalar((dist - SEGMENT_DISTANCE)*0.5));
-        follower.lookAt(leader.position);
+        follower.position.add(dir.multiplyScalar((dist - SEGMENT_DISTANCE) * 0.5));
+        follower.rotationY = Math.atan2(dir.x, dir.z);
       }
     }
 
-    // pickups collision
-    for(let i=pickups.length-1;i>=0;i--){
-      if(pickups[i].position.distanceTo(player.position) < 3){
+    // Update meshes position & rotation & tilt for steering effect
+    // Player car tilt: lean a bit based on turning direction for style
+    let tilt = 0;
+    if (keys['a'] || keys['arrowleft']) tilt = 0.18;
+    else if (keys['d'] || keys['arrowright']) tilt = -0.18;
+
+    for (let i = 0; i < cars.length; i++) {
+      const c = cars[i];
+      c.mesh.position.copy(c.position).setY(1.05);
+      c.mesh.rotation.y = c.rotationY;
+      // Player tilt on Z axis (bank)
+      if (i === 0) c.mesh.rotation.z = THREE.MathUtils.lerp(c.mesh.rotation.z, tilt, 0.2);
+      else c.mesh.rotation.z = 0;
+    }
+
+    // Pickups collision
+    for (let i = pickups.length - 1; i >= 0; i--) {
+      if (pickups[i].position.distanceTo(player.position) < 3) {
         scene.remove(pickups[i]);
-        pickups.splice(i,1);
+        pickups.splice(i, 1);
         score++;
         scoreEl.textContent = score;
-        // add new car
-        const last = cars[cars.length-1];
-        const newCar = makeCar(0xff8a00 + score*5);
-        newCar.position.copy(last.position.clone().add(new THREE.Vector3(0,0,-SEGMENT_DISTANCE)));
-        scene.add(newCar);
-        cars.push(newCar);
+        // Add follower
+        addFollower();
         spawnPickup();
       }
     }
 
-    // obstacle collision
-    for(const obs of obstacles){
-      if(obs.position.distanceTo(player.position) < 4.5){
-        scoreEl.textContent = `Crashed into obstacle! Final Score: ${score}`;
-        alive = false;
-      }
-    }
-
-    // boundary check
-    if(player.position.length() > ARENA_RADIUS){
+    // Boundary check
+    if (player.position.length() > ARENA_RADIUS) {
       scoreEl.textContent = `Hit the wall! Final Score: ${score}`;
       alive = false;
     }
 
-    // camera follow
-    const camOffset = new THREE.Vector3(0,15,-30).applyQuaternion(player.quaternion);
+    // Camera follow
+    const camOffset = new THREE.Vector3(0, 15, -30).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotationY);
     camera.position.copy(player.position.clone().add(camOffset));
     camera.lookAt(player.position);
 
     renderer.render(scene, camera);
   }
+
   animate();
 
-  onresize = () => {
-    camera.aspect = innerWidth/innerHeight;
+  // Resize handler
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
-  };
-  </script>
+  });
+})();
+</script>
 </body>
 </html>
