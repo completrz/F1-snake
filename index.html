@@ -2,28 +2,24 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>F1 Snake — Boost & Car Sprite</title>
+<title>F1 Snake — Visible Box Cars</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   html, body {
     margin: 0; height: 100%; overflow: hidden; background: #111;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-      Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    font-family: sans-serif;
   }
   #ui {
     position: absolute; top: 12px; left: 12px; color: #fff; z-index: 10;
     background: rgba(0,0,0,0.25); padding: 8px 12px; border-radius: 8px;
-    user-select: none;
-  }
-  #ui small {
-    display: block; margin-top: 4px; font-size: 12px; color: #ccc;
   }
 </style>
 </head>
 <body>
 <div id="ui">
   Score: <span id="score">0</span>
-  <small>Controls: A/D or ◀️/▶️ to steer, Space to boost (2s cooldown)</small>
+  <br />
+  Controls: A/D or ◀️/▶️ to steer, Space to boost (2s cooldown)
 </div>
 
 <script src="https://unpkg.com/three@0.154.0/build/three.min.js"></script>
@@ -44,8 +40,13 @@
   renderer.setSize(innerWidth, innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-  scene.add(light);
+  // Lights
+  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+  scene.add(hemiLight);
+
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+  dirLight.position.set(50, 100, 50);
+  scene.add(dirLight);
 
   // Ground
   const ground = new THREE.Mesh(
@@ -53,56 +54,39 @@
     new THREE.MeshStandardMaterial({color:0x0d3b66})
   );
   ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
   scene.add(ground);
 
-  // Shadows helper
-  const shadowMaterial = new THREE.ShadowMaterial({ opacity: 0.4 });
-  shadowMaterial.transparent = true;
-
-  // --- Create a textured plane with embedded base64 F1 car top-down sprite ---
-  // Car image: simple stylized F1 shape (white/red on transparent)
-  // This is a 64x128 px PNG encoded as base64
-  const carBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAEEElEQVR4nO2bTWsUURTGf+/CZGwRFCKzMEWcIq6A4UwQRqFKMIoL0IARExAwEBERvCRUOoJjHgQKXBRcgWByGGXAl8QtIhgwKFRFgBIkEhcJ0FHiRYIY8fPe+5d27ZnmZmZmd2D66qt/T/tlXuu2vm7PPOdbTf4ns4ATjHRF88h6jgDawKeEcZLzDSIGzmQe6E3Et4xnRPTf2NtJUyceEcD9cmVZ1MJ57cApkg3BLSMDOqD3CUhrwJoAlwJGJp+1mXAgcBp2oDyyDNeYHEuI5cAjwCOdLfFTwp9XqXZzvBxLwH2dGwzhyTq9XqZauQIQz+MHyD4Q7xmcm6XQRbAGGcyvTxS/FdyUy7cB5chMRyT48DkAi9V5vXovDKBd2iqPHeD7lIv+fjGzHmHQDcCywBP8ChzHk+8L5cgTXcBx/JULPaFK9EYB3cEuJVLHcgPESnzoEsB3siTKKh22Ec4D5zOfKTiRmAzxhxFcyNcMGOAsxmcwy+JO5DiXgc4EOyAzkytp4wtMdhyJeBwJu9HVt2QDF/K8a8ixcDuzq2v1eRMDjhH9Lu81/3xCM/b6h3Pp0DB/KACbQckQ/4Ms0lNsEzCd4kDfKAGjO3o2fwEM4BQjyAUIXpXBApTnBVuB51QGrORyK5hHSQ9VvC6PwMYcRVMQz+YA7o5zkkAlZr4ZHHkJQZ1ZGYpXfPYtFlvRYl/n7OZCFN3v+DRCmIQ51PJ6TQQ34GzYgS8wO4AboJXwS2EU5s3I8BlZnFvjHaWZ/g9+boqaj4A9dU1+6LGT7uQAAAABJRU5ErkJggg==";
-
-  function makeCarMesh(scale=1) {
-    const tex = new THREE.TextureLoader().load(carBase64);
-    tex.magFilter = THREE.NearestFilter;
-    tex.minFilter = THREE.LinearMipMapLinearFilter;
-
-    const mat = new THREE.MeshBasicMaterial({
-      map: tex,
-      transparent: true,
-      depthWrite: false,
-    });
-    const geo = new THREE.PlaneGeometry(3 * scale, 6 * scale);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.y = 1.05;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
+  // --- Car Mesh (simple box) ---
+  function makeCar(color=0xff2d55) {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(3.4, 1.2, 7.6),
+      new THREE.MeshStandardMaterial({color})
+    );
+    body.position.y = 0.6;
+    group.add(body);
+    return group;
   }
 
   // --- Player & followers ---
   const cars = [];
-  const carMeshes = [];
-  const baseScale = 1;
+  const baseColor = 0xff2d55;
   cars.push({
     position: new THREE.Vector3(0, 0, 0),
     rotationY: 0,
-    mesh: makeCarMesh(baseScale),
+    mesh: makeCar(baseColor),
     boost: { active: false, cooldown: 0, timer: 0 }
   });
   scene.add(cars[0].mesh);
-  cars[0].mesh.position.set(0, 1, 0);
+  cars[0].mesh.position.set(0, 0, 0);
 
   // Followers
   function addFollower() {
-    const scale = baseScale * 0.85;
     const follower = {
       position: new THREE.Vector3(0, 0, 0),
       rotationY: 0,
-      mesh: makeCarMesh(scale),
+      mesh: makeCar(0xff8a00),
     };
     scene.add(follower.mesh);
     cars.push(follower);
@@ -194,19 +178,11 @@
       }
     }
 
-    // Update meshes position & rotation & tilt for steering effect
-    // Player car tilt: lean a bit based on turning direction for style
-    let tilt = 0;
-    if (keys['a'] || keys['arrowleft']) tilt = 0.18;
-    else if (keys['d'] || keys['arrowright']) tilt = -0.18;
-
+    // Update meshes position & rotation
     for (let i = 0; i < cars.length; i++) {
       const c = cars[i];
-      c.mesh.position.copy(c.position).setY(1.05);
+      c.mesh.position.copy(c.position).setY(0.6);
       c.mesh.rotation.y = c.rotationY;
-      // Player tilt on Z axis (bank)
-      if (i === 0) c.mesh.rotation.z = THREE.MathUtils.lerp(c.mesh.rotation.z, tilt, 0.2);
-      else c.mesh.rotation.z = 0;
     }
 
     // Pickups collision
