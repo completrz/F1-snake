@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>F1 Snake — Followers Spawn Behind</title>
+<title>F1 Snake — Correct Tail Spawn</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <style>
   html, body {
@@ -86,13 +86,13 @@
   function addFollower() {
     const leader = cars[cars.length - 1];
     const follower = {
-      position: new THREE.Vector3(),
+      position: new THREE.Vector3().copy(leader.position),
       rotationY: leader.rotationY,
       mesh: makeCar(0xff8a00),
     };
-    // Position follower behind leader by SEGMENT_DISTANCE
+    // Offset backward so no overlap: move back by SEGMENT_DISTANCE along leader's facing direction
     const backOffset = new THREE.Vector3(0, 0, -SEGMENT_DISTANCE).applyAxisAngle(new THREE.Vector3(0,1,0), leader.rotationY);
-    follower.position.copy(leader.position).add(backOffset);
+    follower.position.add(backOffset);
     scene.add(follower.mesh);
     cars.push(follower);
   }
